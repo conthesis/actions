@@ -16,9 +16,6 @@ uvicorn = "*"
 orjson = "*"
 httpx = "*"
 environs = "*"
-neovim-skip-lock = "*"
-neovim = "*"
-nvim = "*"
 pytest = "*"
 
 [requires]
