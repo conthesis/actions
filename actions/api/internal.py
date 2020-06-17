@@ -24,7 +24,7 @@ COMPGRAPH_BASE_URL = os.environ["COMPGRAPH_BASE_URL"]
 async def post_action(http_client, url, properties: Dict[str, Any]):
     res = await http_client.post(url, json=properties)
     res.raise_for_status()
-    return await res.json()
+    return res.json()
 
 @router.post("/compute")
 async def compute_internal_action(action_request: ActionRequest, http_client = Depends(http_client)) -> Dict[str, Any]:
