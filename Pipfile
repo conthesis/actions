@@ -6,9 +6,7 @@ verify_ssl = true
 [dev-packages]
 mypy = "*"
 pytest = "*"
-black = "*"
-isort = {extras = ["pipfile"],version = "*"}
-flake8 = "*"
+happier = "*"
 
 [packages]
 fastapi = "*"
@@ -23,8 +21,6 @@ python_version = "3.8"
 
 [scripts]
 server = "uvicorn --port 8002 --reload actions.main:app"
-fmt = "black -t py38  ."
-fmt_imports = "isort --multi-line=3 --trailing-comma --force-grid-wrap=0 --use-parentheses --line-width=88"
 check = "mypy ."
 test = "python -m pytest"
 
