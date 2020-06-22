@@ -3,10 +3,9 @@ from typing import Optional
 import httpx
 from fastapi import Depends
 
-from .dcollect import DCollect
 from .cas import CAS
+from .dcollect import DCollect
 from .entity_fetcher import EntityFetcher
-
 
 http_client_: Optional[httpx.AsyncClient] = None
 cas_: Optional[CAS] = None
@@ -20,11 +19,13 @@ def http_client() -> httpx.AsyncClient:
         http_client_ = httpx.AsyncClient()
     return http_client_
 
+
 def cas(http_client: httpx.AsyncClient = Depends(http_client)) -> CAS:
     global cas_
     if cas_ is None:
         cas_ = CAS(http_client)
     return cas_
+
 
 def dcollect(http_client: httpx.AsyncClient = Depends(http_client)) -> DCollect:
     global dcollect_
@@ -32,7 +33,10 @@ def dcollect(http_client: httpx.AsyncClient = Depends(http_client)) -> DCollect:
         dcollect_ = DCollect(http_client)
     return dcollect_
 
-def entity_fetcher(dc: DCollect = Depends(dcollect), cas: CAS = Depends(cas)) -> EntityFetcher:
+
+def entity_fetcher(
+    dc: DCollect = Depends(dcollect), cas: CAS = Depends(cas)
+) -> EntityFetcher:
     global entity_fetcher_
     if entity_fetcher_ is None:
         entity_fetcher_ = EntityFetcher(dc, cas)
