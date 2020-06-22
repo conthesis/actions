@@ -35,6 +35,9 @@ class ActionRequest(BaseModel):
     kind: str
     properties: List[ActionProperty]
 
+class ActionByEntityRequest(BaseModel):
+    action_id: str
+
 
 COMPGRAPH_BASE_URL = os.environ["COMPGRAPH_BASE_URL"]
 
@@ -71,6 +74,21 @@ async def perform_action(
             http_client, f"{COMPGRAPH_BASE_URL}triggerProcess", properties
         )
     return {}
+
+
+@router.post("/compute-entity")
+async def compute_entity(
+        action_by_entity: ActionByEntityRequest,
+        http_client=Depends(http_client),
+        entity_fetcher=Depends(entity_fetcher),
+) -> Dict[str, Any]:
+
+    action_id = action_by_entity.action_id
+    action = ActionRequest(**await entity_fetcher.fetch_json(action_id))
+    resolved = await resolve_properties(entity_fetcher, action.properties)
+    res = await perform_action(http_client, action.kind, resolved)
+    return res
+
 
 
 @router.post("/compute")
