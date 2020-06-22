@@ -6,11 +6,13 @@ from fastapi import Depends
 from .cas import CAS
 from .dcollect import DCollect
 from .entity_fetcher import EntityFetcher
+from .service import Service
 
 http_client_: Optional[httpx.AsyncClient] = None
 cas_: Optional[CAS] = None
 dcollect_: Optional[DCollect] = None
 entity_fetcher_: Optional[EntityFetcher] = None
+service_: Optional[Service] = None
 
 
 def http_client() -> httpx.AsyncClient:
@@ -41,3 +43,13 @@ def entity_fetcher(
     if entity_fetcher_ is None:
         entity_fetcher_ = EntityFetcher(dc, cas)
     return entity_fetcher_
+
+
+def service(
+    http_client: httpx.AsyncClient = Depends(http_client),
+    entity_fetcher: EntityFetcher = Depends(entity_fetcher),
+) -> Service:
+    global service_
+    if service_ is None:
+        service_ = Service(http_client, entity_fetcher)
+    return service_
