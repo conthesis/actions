@@ -1,6 +1,6 @@
-from fastapi.dependencies.utils import solve_dependencies, get_dependant
-import actions.deps as deps
+from fastapi.dependencies.utils import get_dependant, solve_dependencies
 
+import actions.deps as deps
 
 
 async def startup():

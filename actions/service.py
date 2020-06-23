@@ -1,33 +1,29 @@
-from typing import Dict, Any, List
-import httpx
-import os
+from typing import Any, Dict, List
+
+import orjson
+from nats.aio.client import Client as NATS
 
 from actions.entity_fetcher import EntityFetcher
-from actions.model import ActionProperty, ActionRequest, PropertyKind, DataFormat
+from actions.model import ActionProperty, ActionRequest, DataFormat, PropertyKind
 
-COMPGRAPH_BASE_URL = os.environ["COMPGRAPH_BASE_URL"]
+
+def _service_queue(kind: str) -> str:
+    return f"conthesis.action.{kind}"
 
 
 class Service:
-    def __init__(self, http_client: httpx.AsyncClient, entity_fetcher: EntityFetcher):
-        self.http_client = http_client
+    def __init__(self, nc: NATS, entity_fetcher: EntityFetcher):
+        self.nc = nc
         self.entity_fetcher = entity_fetcher
-
-    async def post_action(self, url: str, properties: Dict[str, Any]):
-        res = await self.http_client.post(url, json=properties)
-        res.raise_for_status()
-        return res.json()
 
     async def perform_action(
         self, kind: str, properties: Dict[str, Any]
     ) -> Dict[str, Any]:
-        if kind == "identity":
-            return identity(properties)
-        elif kind == "TriggerDAG":
-            return await self.post_action(
-                f"{COMPGRAPH_BASE_URL}triggerProcess", properties
-            )
-        return {}
+        props_json = orjson.dumps(properties)
+        resp = await self.nc.request(_service_queue(kind), props_json)
+        if resp.data is None or len(resp.data) == 0:
+            return None
+        return orjson.loads(resp.data)
 
     async def resolve_value(self, prop: ActionProperty) -> Any:
         if prop.kind == PropertyKind.LITERAL:
@@ -38,7 +34,9 @@ class Service:
             if prop.data_format == DataFormat.JSON:
                 return await self.entity_fetcher.fetch_json(prop.value)
 
-    async def resolve_properties(self, properties: List[ActionProperty]) -> Dict[str, Any]:
+    async def resolve_properties(
+        self, properties: List[ActionProperty]
+    ) -> Dict[str, Any]:
         return {p.name: await self.resolve_value(p) for p in properties}
 
     async def compute_entity(self, entity: str):

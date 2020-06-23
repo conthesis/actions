@@ -1,7 +1,8 @@
-from typing import Union, List, Dict
 from enum import Enum
-from pydantic import BaseModel
+from typing import Dict, List, Union
+
 import orjson
+from pydantic import BaseModel
 
 
 class PropertyKind(Enum):
