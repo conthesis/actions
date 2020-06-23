@@ -44,8 +44,8 @@ class Service:
     async def compute_entity(self, entity: str):
         action = ActionRequest(**await self.entity_fetcher.fetch_json(entity))
         resolved = await self.resolve_properties(action.properties)
-        return await self.perform_action(http_client, action.kind, resolved)
+        return await self.perform_action(action.kind, resolved)
 
     async def compute_literal(self, req: ActionRequest):
         resolved = await resolve_properties(entity_fetcher, action_request.properties)
-        return await perform_action(http_client, action_request.kind, resolved)
+        return await self.perform_action(action_request.kind, resolved)

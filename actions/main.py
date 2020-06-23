@@ -1,11 +1,35 @@
+import httpx
+import asyncio
 from fastapi import FastAPI
+from .cas import CAS
+from .dcollect import DCollect
+from .entity_fetcher import EntityFetcher
+from .service import Service
+from .worker import Worker
 
-import actions.api as api
-import actions.hooks as hooks
+async def main():
+    actions = Actions()
+    await actions.setup()
+    await actions.wait_for_shutdown()
 
-app = FastAPI()
+class Actions:
+    def __init__(self):
+        self.http_client = httpx.AsyncClient()
+        self.shutdown_f = asyncio.get_running_loop().create_future()
+        cas = CAS(self.http_client)
+        dcollect = DCollect(self.http_client)
+        entity_fetcher = EntityFetcher(dcollect, cas)
+        service = Service(self.http_client, entity_fetcher)
+        self.worker = Worker(service)
 
-app.include_router(api.router)
+    async def setup(self):
+        await self.worker.setup()
 
-# app.on_event("startup")(hooks.startup)
-app.on_event("shutdown")(hooks.shutdown)
+    async def wait_for_shutdown(self):
+        await self.shutdown_f
+
+    async def shutdown(self):
+        try:
+            await self.http_client.aclose()
+        finally:
+            self.shutdown_f.set_result(True)

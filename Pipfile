@@ -15,6 +15,7 @@ orjson = "*"
 httpx = "*"
 environs = "*"
 pytest = "*"
+asyncio-nats-client = "*"
 
 [requires]
 python_version = "3.8"

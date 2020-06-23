@@ -1,6 +1,7 @@
 from typing import Union, List, Dict
 from enum import Enum
 from pydantic import BaseModel
+import orjson
 
 
 class PropertyKind(Enum):
@@ -23,3 +24,7 @@ class ActionProperty(BaseModel):
 class ActionRequest(BaseModel):
     kind: str
     properties: List[ActionProperty]
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "ActionRequest":
+        return cls(**orjson.loads(data))
