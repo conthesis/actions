@@ -9,13 +9,12 @@ pytest = "*"
 happier = "*"
 
 [packages]
-fastapi = "*"
-uvicorn = "*"
 orjson = "*"
 httpx = "*"
 environs = "*"
 pytest = "*"
 asyncio-nats-client = "*"
+pydantic = "*"
 
 [requires]
 python_version = "3.8"
