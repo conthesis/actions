@@ -125,24 +125,24 @@
         },
         "orjson": {
             "hashes": [
-                "sha256:003c96a677aa0b64a3cdd60f71b442ca8be09305a4d6b8ddafe136b4e9a89b8f",
-                "sha256:07fe57f80a771e60f02f945a6dbb036e6aab835f6f9779bc4aa192d858fb2381",
-                "sha256:0c72bfb36a322580cf1e212f7d040f5e38eba66ea3afea909c531cf83927724e",
-                "sha256:2044683c455a665d7e0cff988fbc1fea0ec283cf0c02029161fb1510fd7b6a6a",
-                "sha256:34ffec09b427488b874d108659c5fc30dbd62789808917fd28a79ca41a7cc484",
-                "sha256:3670a379d4ba3a222d0ee22ecb1a2e3c643b982ecc82e22a42c3a9f9fd24193b",
-                "sha256:3f4414481537e1882f96f640f7932919b09dccef3bb5ae1312a074806c7e24eb",
-                "sha256:409ed91d9ab7f7bdb4d50768b9697051b0891d1a7e9c04818b4a00bf2d6bddd7",
-                "sha256:6d3d786735e126a40905b0910528f02ef7087c78de825b6aab8d39c08500b4e2",
-                "sha256:6ff421ae71b4b148b8c859179ae55287513b546188ef6d8925048a2de5f85319",
-                "sha256:7ef3aec433ef0443d458b6045bebc57d6692094dcf778b9c22882e9dc210063e",
-                "sha256:81e82fb560ba1ff78e70d217e62c4381c2416dcdb2c440b830121226f8cf00da",
-                "sha256:8de85c2c814cbfa595b60655856d91c49678c8d8efe97101345824aa794a0f6e",
-                "sha256:c49eb54e3cfc4c0b14ca566b8ec2f3bc6f5860b0f60145e6003a40a14227554a",
-                "sha256:e6f150bb1bd89e324d4b1768bdaca90536f0a42e32b7ab5fe31aa4b23ee779ef"
+                "sha256:04553ab8d8dc61a808f4de7bb542a27cd7066af824534dfc3f80003d24401142",
+                "sha256:1ab640d03127dd05c01ad68c8a38ce07978738d7cf5bb7e5d027e257da3cb686",
+                "sha256:3ec58e26f9ee1dbb79da97e12e72e146205d5eca5d9262d40c9c3c347cd168af",
+                "sha256:44fc97a419786efc2fde39e745f30fed4adcdc372608536b218f49ad0eddc6f4",
+                "sha256:49e77aad2a45927c505b59cf4d657b0c4e133643345677459b2418932acaec2a",
+                "sha256:50f9210d8b87debbf1144747d1c63bafd2d6849f7ab8b808f9a668f68a565157",
+                "sha256:6c6bf06e25eaff065d74be248be3180f9aafbc2209862fdde601328c965b89d5",
+                "sha256:76d37ad8012f224f23a81ea522e89d17cdda76167a6847bbd8cde7386473d6a0",
+                "sha256:802338ef0fa9bddde33fe7336b3973138495f2e82eb7328e3def118ed30e3893",
+                "sha256:a23125283bc21dde0b7977abbf45bb9342feb6a39f56f9903cb05f245f8c803a",
+                "sha256:a877ccfe1720f3d8cbae3de5e9671a2f213957bd531777aeae8c239add3e7476",
+                "sha256:b05979ca41a85de15c7be12d47c73372416dbb3a614d28d254edbf9eca665d16",
+                "sha256:c06aba9548dc544005e20947f2ebfe30d98e950c2495c90331df44e14a06d11e",
+                "sha256:c28218ded6685ad8ecb610cad9e23699fbdef586da8b6f16fb5c08185b6f9377",
+                "sha256:ca75529c0433d5297fa061bf0012b976d895ad943542a3353cf85b9ef5ee7863"
             ],
             "index": "pypi",
-            "version": "==3.1.1"
+            "version": "==3.1.2"
         },
         "packaging": {
             "hashes": [
@@ -160,10 +160,10 @@
         },
         "py": {
             "hashes": [
-                "sha256:a673fa23d7000440cc885c17dbd34fafcb7d7a6e230b29f6766400de36a33c44",
-                "sha256:f3b3a4c36512a4c4f024041ab51866f11761cc169670204b235f6b20523d4e6b"
+                "sha256:366389d1db726cd2fcfc79732e75410e5fe4d31db13692115529d34069a043c2",
+                "sha256:9ca6883ce56b4e8da7e79ac18787889fa5206c79dcc67fb065376cd2fe03f342"
             ],
-            "version": "==1.8.2"
+            "version": "==1.9.0"
         },
         "pydantic": {
             "hashes": [
@@ -431,10 +431,10 @@
         },
         "py": {
             "hashes": [
-                "sha256:a673fa23d7000440cc885c17dbd34fafcb7d7a6e230b29f6766400de36a33c44",
-                "sha256:f3b3a4c36512a4c4f024041ab51866f11761cc169670204b235f6b20523d4e6b"
+                "sha256:366389d1db726cd2fcfc79732e75410e5fe4d31db13692115529d34069a043c2",
+                "sha256:9ca6883ce56b4e8da7e79ac18787889fa5206c79dcc67fb065376cd2fe03f342"
             ],
-            "version": "==1.8.2"
+            "version": "==1.9.0"
         },
         "pyflakes": {
             "hashes": [

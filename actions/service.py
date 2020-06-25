@@ -4,7 +4,14 @@ import orjson
 from nats.aio.client import Client as NATS
 
 from actions.entity_fetcher import EntityFetcher
-from actions.model import ActionProperty, ActionRequest, DataFormat, PropertyKind
+from actions.model import (
+    Action,
+    ActionProperty,
+    ActionSource,
+    ActionTrigger,
+    DataFormat,
+    PropertyKind,
+)
 
 
 def _service_queue(kind: str) -> str:
@@ -25,7 +32,7 @@ class Service:
             return None
         return orjson.loads(resp.data)
 
-    async def resolve_value(self, prop: ActionProperty) -> Any:
+    async def resolve_value(self, prop: ActionProperty, meta: Dict[str, Any]) -> Any:
         if prop.kind == PropertyKind.LITERAL:
             return prop.value
         elif prop.kind == PropertyKind.CAS_POINTER:
@@ -33,17 +40,34 @@ class Service:
         elif prop.kind == PropertyKind.ENTITY:
             if prop.data_format == DataFormat.JSON:
                 return await self.entity_fetcher.fetch_json(prop.value)
+            else:
+                return await self.entity_fetcher.fetch(prop.value)
+        elif prop.kind == PropertyKind.META_FIELD:
+            return meta.get(prop.value)
+        elif prop.kind == PropertyKind.META_ENTITY:
+            mval = meta.get(prop.value)
+            if mval is None:
+                return None
+            return await self.entity_fetcher.fetch(mval)
 
     async def resolve_properties(
-        self, properties: List[ActionProperty]
+        self, properties: List[ActionProperty], meta: Dict[str, Any]
     ) -> Dict[str, Any]:
-        return {p.name: await self.resolve_value(p) for p in properties}
+        return {p.name: await self.resolve_value(p, meta) for p in properties}
 
-    async def compute_entity(self, entity: str):
-        action = ActionRequest(**await self.entity_fetcher.fetch_json(entity))
-        resolved = await self.resolve_properties(action.properties)
+    async def get_action(self, trigger: ActionTrigger) -> Action:
+        if trigger.action_source == ActionSource.LITERAL and isinstance(
+            trigger.action, Action
+        ):
+            return trigger.action
+        elif trigger.action_source == ActionSource.ENTITY and isinstance(
+            trigger.action, str
+        ):
+            return Action.from_bytes(await self.entity_fetcher.fetch(trigger.action))
+        else:
+            raise RuntimeError("Illegal action trigger")
+
+    async def compute(self, trigger: ActionTrigger):
+        action = await self.get_action(trigger)
+        resolved = await self.resolve_properties(action.properties, trigger.meta)
         return await self.perform_action(action.kind, resolved)
-
-    async def compute_literal(self, req: ActionRequest):
-        resolved = await resolve_properties(entity_fetcher, action_request.properties)
-        return await self.perform_action(action_request.kind, resolved)
