@@ -48,7 +48,10 @@ class Service:
             mval = meta.get(prop.value)
             if mval is None:
                 return None
-            return await self.entity_fetcher.fetch(mval)
+            if prop.data_format == DataFormat.JSON:
+                return await self.entity_fetcher.fetch_json(mval)
+            else:
+                return await self.entity_fetcher.fetch(mval)
 
     async def resolve_properties(
         self, properties: List[ActionProperty], meta: Dict[str, Any]

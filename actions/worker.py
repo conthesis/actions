@@ -39,7 +39,6 @@ class Worker:
             return
 
         try:
-
             res = await self.svc.compute(trigger)
             await self.reply(msg, res)
         except Exception:
