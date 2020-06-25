@@ -8,7 +8,7 @@ from nats.aio.client import Client as NATS
 from actions.model import ActionTrigger
 from actions.service import Service
 
-TOPIC = "conthesis.actions.TriggerAction"
+TOPIC = "conthesis.action.TriggerAction"
 
 
 class Worker:
@@ -30,8 +30,16 @@ class Worker:
             await self.nc.publish(reply, serialized)
 
     async def handle(self, msg):
+        trigger = None
         try:
             trigger = ActionTrigger.from_bytes(msg.data)
+        except Exception:
+            print("Invalid format:", msg.data)
+            traceback.print_exc()
+            return
+
+        try:
+
             res = await self.svc.compute(trigger)
             await self.reply(msg, res)
         except Exception:
