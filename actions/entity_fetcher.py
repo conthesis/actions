@@ -1,22 +1,22 @@
 from typing import Optional
 
-from nats.aio.client import Client as NATS
 import orjson
-
-from .dcollect import DCollect
+from nats.aio.client import Client as NATS
 
 CAS_GET = "conthesis.cas.get"
+DCOLLECT_GET = "conthesis.dcollect.get"
+
 
 class EntityFetcher:
-    dc: DCollect
     nc: NATS
-    def __init__(self, dc: DCollect, nc: NATS):
-        self.dc = dc
+
+    def __init__(self, nc: NATS):
         self.nc = nc
 
     async def fetch(self, entity: str) -> Optional[bytes]:
-        ptr = await self.dc.get_pointer(entity)
-        if ptr is None:
+        ptr_res = await self.nc.request(DCOLLECT_GET, entity.encode("utf-8"))
+        ptr = ptr_res.data
+        if ptr is None or len(ptr) == 0:
             return None
         res = await self.nc.request(CAS_GET, ptr, timeout=1)
         if res.data is None or len(res.data) == 0:
