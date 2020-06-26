@@ -1,24 +1,28 @@
 from typing import Optional
 
+from nats.aio.client import Client as NATS
 import orjson
 
-from .cas import CAS
 from .dcollect import DCollect
 
+CAS_GET = "conthesis.cas.get"
 
 class EntityFetcher:
     dc: DCollect
-    cas: CAS
-
-    def __init__(self, dc: DCollect, cas: CAS):
+    nc: NATS
+    def __init__(self, dc: DCollect, nc: NATS):
         self.dc = dc
-        self.cas = cas
+        self.nc = nc
 
     async def fetch(self, entity: str) -> Optional[bytes]:
         ptr = await self.dc.get_pointer(entity)
         if ptr is None:
             return None
-        return await self.cas.get(ptr)
+        res = await self.nc.request(CAS_GET, ptr, timeout=1)
+        if res.data is None or len(res.data) == 0:
+            return None
+        else:
+            return res.data
 
     async def fetch_json(self, entity: str) -> Optional[dict]:
         data = await self.fetch(entity)

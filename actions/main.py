@@ -3,7 +3,6 @@ import asyncio
 import httpx
 from nats.aio.client import Client as NATS
 
-from .cas import CAS
 from .dcollect import DCollect
 from .entity_fetcher import EntityFetcher
 from .service import Service
@@ -21,9 +20,8 @@ class Actions:
         self.http_client = httpx.AsyncClient()
         self.shutdown_f = asyncio.get_running_loop().create_future()
         nats = NATS()
-        cas = CAS(self.http_client)
         dcollect = DCollect(self.http_client)
-        entity_fetcher = EntityFetcher(dcollect, cas)
+        entity_fetcher = EntityFetcher(dcollect, nats)
         service = Service(nats, entity_fetcher)
         self.worker = Worker(nats, service)
 
