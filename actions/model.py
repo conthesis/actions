@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import orjson
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ class ActionProperty(BaseModel):
 class Action(BaseModel):
     kind: str
     properties: List[ActionProperty]
+    wildcard_triggers: Optional[List[str]] = []
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "Action":
