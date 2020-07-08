@@ -27,7 +27,11 @@ class Service:
         self, kind: str, properties: Dict[str, Any]
     ) -> Dict[str, Any]:
         props_json = orjson.dumps(properties)
-        resp = await self.nc.request(_service_queue(kind), props_json)
+        try:
+            resp = await self.nc.request(_service_queue(kind), props_json, timeout=5.0)
+        except:
+            print("Timeout waiting for response on", _service_queue(kind))
+            return None
         if resp.data is None or len(resp.data) == 0:
             return None
         return orjson.loads(resp.data)
@@ -66,7 +70,10 @@ class Service:
         elif trigger.action_source == ActionSource.ENTITY and isinstance(
             trigger.action, str
         ):
-            return Action.from_bytes(await self.entity_fetcher.fetch(trigger.action))
+            data = await self.entity_fetcher.fetch(trigger.action)
+            if data is None:
+                raise RuntimeError(f"Action {trigger.action} not found")
+            return Action.from_bytes(data)
         else:
             raise RuntimeError("Illegal action trigger")
 
