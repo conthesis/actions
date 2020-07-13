@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Union
 import orjson
 from pydantic import BaseModel
 
-
 class PropertyKind(Enum):
     ENTITY = "ENTITY"
     CAS_POINTER = "CAS_POINTER"
