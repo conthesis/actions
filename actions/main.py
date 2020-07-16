@@ -1,11 +1,11 @@
 import asyncio
 
-import httpx
 from nats.aio.client import Client as NATS
 
 from .entity_fetcher import EntityFetcher
 from .service import Service
 from .worker import Worker
+from .jobs import JobsManager
 
 
 async def main():
@@ -16,12 +16,12 @@ async def main():
 
 class Actions:
     def __init__(self):
-        self.http_client = httpx.AsyncClient()
         self.shutdown_f = asyncio.get_running_loop().create_future()
         nats = NATS()
         entity_fetcher = EntityFetcher(nats)
         service = Service(nats, entity_fetcher)
-        self.worker = Worker(nats, service)
+        jobs = JobsManager(service)
+        self.worker = Worker(nats, service, jobs)
 
     async def setup(self):
         await self.worker.setup()
@@ -32,6 +32,5 @@ class Actions:
     async def shutdown(self):
         try:
             await self.worker.shutdown()
-            await self.http_client.aclose()
         finally:
             self.shutdown_f.set_result(True)

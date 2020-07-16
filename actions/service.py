@@ -17,6 +17,9 @@ from actions.model import (
 def _service_queue(kind: str) -> str:
     return f"conthesis.action.{kind}"
 
+def _response_queue(jid: str) -> str:
+    return f"conthesis.actions.responses.{jid}"
+
 
 class Service:
     def __init__(self, nc: NATS, entity_fetcher: EntityFetcher):
@@ -35,6 +38,9 @@ class Service:
         if resp.data is None or len(resp.data) == 0:
             return None
         return orjson.loads(resp.data)
+
+    async def perform_action_async(self, jid: str, kind: str, properties: Dict[str, Any]) -> None:
+        await self.nc.publish_request(_service_queue(kind), _response_queue(jid), orjson.dumps(properties))
 
     async def resolve_value(self, prop: ActionProperty, meta: Dict[str, Any]) -> Any:
         if prop.kind == PropertyKind.LITERAL:
