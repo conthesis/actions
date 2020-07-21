@@ -2,21 +2,24 @@ import asyncio
 import os
 import aredis
 import orjson
+import traceback
 from .model import Action, ActionTrigger
 from transitions import Transition
 from transitions.extensions.asyncio import AsyncMachine
 from enum import Enum
 from typing import Any, Optional
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('transitions').setLevel(logging.INFO)
+JOB_LOCK_LEASE_TIMEOUT = 5
+
+class UnableToAcquireLockError(Exception):
+    pass
 
 class JobsManager:
     def __init__(self, svc):
         self.svc = svc
         redis = aredis.StrictRedis.from_url(os.environ["REDIS_URL"])
         self.storage = Storage(redis)
+        self.run = True
 
     async def register(self, trigger):
         async with JidSession(self.svc, self.storage, trigger.jid) as j:
@@ -29,10 +32,45 @@ class JobsManager:
             time_remaining = await _in_x_seconds(3)
             await j.resume_and_process(time_remaining, "success", data)
 
-    async def timeout(self, jid):
-        async with JidSession(self.svc, self.storage, jid) as j:
+    async def timeout(self, jid, blocking):
+        async with JidSession(self.svc, self.storage, jid, blocking=blocking) as j:
             time_remaining = await _in_x_seconds(3)
             await j.timeout_and_process(time_remaining)
+
+
+    async def setup(self):
+        self.periodic = asyncio.create_task(self.periodic_check_loop())
+
+    async def periodic_check_loop(self):
+        print("Periodic check running")
+        while True:
+            try:
+                await self.periodic_check()
+            except Exception:
+                traceback.print_exc()
+            for i in range(5):
+                await asyncio.sleep(1)
+                if not self.run:
+                    return
+
+    async def stop():
+        self.run = False
+        await self.periodic
+
+    async def periodic_check(self):
+        running = await self.storage.random_sample(Status.RUNNING)
+
+        n_running = len(running)
+        if n_running > 0:
+            print(f"Found {n_running} jobs with state {Status.RUNNING}")
+        for jid in running:
+            try:
+                await self.timeout(jid, False)
+            except UnableToAcquireLockError:
+                pass
+            except Exception:
+                print(f"Error handling jid={jid}")
+                traceback.print_exc()
 
 
 class Status(Enum):
@@ -71,14 +109,18 @@ async def _in_x_seconds(secs):
     return lambda: not fut.done()
 
 class JidSession:
-    def __init__(self, service, storage, jid):
+    def __init__(self, service, storage, jid, blocking=True):
         self.service = service
         self.storage = storage
         self.jid = jid
         self.jid_storage = JidStorage(self.jid, self.storage)
+        self.blocking = blocking
 
     async def __aenter__(self):
-        await (await self.jid_storage.lock()).acquire(blocking=True)
+        locked = await (await self.jid_storage.lock()).acquire(blocking=self.blocking)
+
+        if not locked:
+            raise UnableToAcquireLockError()
 
         self.job = Job(self.jid, self.jid_storage, self.service, await self.jid_storage.get_state())
         return self.job
@@ -96,15 +138,24 @@ class Storage:
     def _key(self, jid, key):
         return f"job-{jid}-{key}"
 
-    async def lock(self, jid):
-        return self.redis.lock(f"job-lock-{jid}")
+    def _set_key(self, state):
+        return f"job-state-{state}"
 
-    async def set(self, jid, params):
+    async def lock(self, jid):
+        return self.redis.lock(f"job-lock-{jid}", timeout=JOB_LOCK_LEASE_TIMEOUT)
+
+    async def set(self, jid, params, src_state):
         await self.redis.mset({ self._key(jid, k): v for (k, v) in params.items() })
+        if "state" in params:
+            await self.redis.srem(self._set_key(src_state), jid)
+            await self.redis.sadd(self._set_key(params["state"]), jid)
 
     async def get(self, jid, key):
         return await self.redis.get(self._key(jid, key))
 
+    async def random_sample(self, state, n=15):
+        state_name = state if isinstance(state, str) else state.value
+        return await self.redis.srandmember(state_name, n)
 
 
 class JidStorage:
@@ -113,6 +164,7 @@ class JidStorage:
         self.storage = storage
         self.dirty = set()
         self.cached = {}
+        self.src_state = None
         self.flushing = None
         self._lock = None
 
@@ -126,7 +178,7 @@ class JidStorage:
             raise RuntimeError("May not flush while flush is in progress")
 
         flushed = { k: self.cached[k] for k in self.dirty }
-        await self.storage.set(self.jid, flushed)
+        await self.storage.set(self.jid, flushed, self.src_state)
         self.cached = {}
         self.dirty = set()
 
@@ -136,7 +188,11 @@ class JidStorage:
 
     async def get(self, key: str) -> Any:
         if key not in self.cached:
-            self.cached[key] = await self.storage.get(self.jid, key)
+            val = await self.storage.get(self.jid, key)
+            self.cached[key] = val
+            if key == "state":
+                self.src_state = val
+            return val
         return self.cached[key]
 
     async def get_trigger(self):

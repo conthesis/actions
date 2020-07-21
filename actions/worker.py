@@ -56,8 +56,6 @@ class Worker:
         end = time.monotonic()
 
         delta = end - start
-        print(round(delta * 1000, 2))
-
 
     async def handle_action_response(self, msg):
         try:

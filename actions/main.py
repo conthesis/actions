@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from nats.aio.client import Client as NATS
 
@@ -20,17 +21,19 @@ class Actions:
         nats = NATS()
         entity_fetcher = EntityFetcher(nats)
         service = Service(nats, entity_fetcher)
-        jobs = JobsManager(service)
-        self.worker = Worker(nats, service, jobs)
+        self.jobs = JobsManager(service)
+        self.worker = Worker(nats, service, self.jobs)
 
     async def setup(self):
         await self.worker.setup()
+        await self.jobs.setup()
 
     async def wait_for_shutdown(self):
         await self.shutdown_f
 
     async def shutdown(self):
         try:
+            await self.jobs.stop()
             await self.worker.shutdown()
         finally:
             self.shutdown_f.set_result(True)
