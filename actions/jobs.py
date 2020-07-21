@@ -130,13 +130,14 @@ class JidSession:
         await self.jid_storage.flush()
         await (await self.jid_storage.lock()).release()
 
+STORAGE_EXPIRY = 6 * 60 * 60
 
 class Storage:
     def __init__(self, redis):
         self.redis = redis
 
-    def _key(self, jid, key):
-        return f"job-{jid}-{key}"
+    def _key(self, jid):
+        return f"job-{jid}"
 
     def _set_key(self, state):
         return f"job-state-{state}"
@@ -145,17 +146,19 @@ class Storage:
         return self.redis.lock(f"job-lock-{jid}", timeout=JOB_LOCK_LEASE_TIMEOUT)
 
     async def set(self, jid, params, src_state):
-        await self.redis.mset({ self._key(jid, k): v for (k, v) in params.items() })
+        await self.redis.hmset(self._key(jid), params)
+        await self.redis.expire(self._key(jid), STORAGE_EXPIRY)
+
         if "state" in params:
             await self.redis.srem(self._set_key(src_state), jid)
             await self.redis.sadd(self._set_key(params["state"]), jid)
 
     async def get(self, jid, key):
-        return await self.redis.get(self._key(jid, key))
+        return await self.redis.hget(self._key(jid), key)
 
     async def random_sample(self, state, n=15):
         state_name = state if isinstance(state, str) else state.value
-        return await self.redis.srandmember(state_name, n)
+        return await self.redis.srandmember(self._set_key(state_name), n)
 
 
 class JidStorage:
