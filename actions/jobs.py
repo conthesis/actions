@@ -1,3 +1,4 @@
+import time
 import asyncio
 import os
 import aredis
@@ -9,9 +10,19 @@ from transitions.extensions.asyncio import AsyncMachine
 from enum import Enum
 from typing import Any, Optional
 
+
 JOB_LOCK_LEASE_TIMEOUT = 5
 
+JOB_RUNNING_TIMEOUT = 30
+
+def ts_now():
+    return int(time.time())
+
+
 class UnableToAcquireLockError(Exception):
+    pass
+
+class TriggerDataMissing(Exception):
     pass
 
 class JobsManager:
@@ -27,16 +38,15 @@ class JobsManager:
             time_remaining = await _in_x_seconds(3)
             await j.process(time_remaining)
 
+    async def process(self, jid, src_state=None, blocking=True):
+        async with JidSession(self.svc, self.storage, jid, blocking=blocking, src_state=src_state) as j:
+            time_remaining = await _in_x_seconds(3)
+            await j.process(time_remaining)
+
     async def resume(self, jid, data):
         async with JidSession(self.svc, self.storage, jid) as j:
             time_remaining = await _in_x_seconds(3)
             await j.resume_and_process(time_remaining, "success", data)
-
-    async def timeout(self, jid, blocking):
-        async with JidSession(self.svc, self.storage, jid, blocking=blocking) as j:
-            time_remaining = await _in_x_seconds(3)
-            await j.timeout_and_process(time_remaining)
-
 
     async def setup(self):
         self.periodic = asyncio.create_task(self.periodic_check_loop())
@@ -58,19 +68,19 @@ class JobsManager:
         await self.periodic
 
     async def periodic_check(self):
-        running = await self.storage.random_sample(Status.RUNNING)
-
-        n_running = len(running)
-        if n_running > 0:
-            print(f"Found {n_running} jobs with state {Status.RUNNING}")
-        for jid in running:
-            try:
-                await self.timeout(jid, False)
-            except UnableToAcquireLockError:
-                pass
-            except Exception:
-                print(f"Error handling jid={jid}")
-                traceback.print_exc()
+        for status in [Status.RUNNING, Status.PENDING]:
+            jobs = await self.storage.random_sample(status)
+            n_jobs = len(jobs)
+            if n_jobs > 0:
+                print(f"Found {n_jobs} jobs with state {status}")
+            for jid in jobs:
+                try:
+                    await self.process(jid.decode("utf-8"), blocking=False, src_state=status.value.encode("utf-8"))
+                except UnableToAcquireLockError:
+                    pass
+                except Exception:
+                    print(f"Error handling jid={jid}")
+                    traceback.print_exc()
 
 
 class Status(Enum):
@@ -109,11 +119,11 @@ async def _in_x_seconds(secs):
     return lambda: not fut.done()
 
 class JidSession:
-    def __init__(self, service, storage, jid, blocking=True):
+    def __init__(self, service, storage, jid, blocking=True, src_state=None):
         self.service = service
         self.storage = storage
         self.jid = jid
-        self.jid_storage = JidStorage(self.jid, self.storage)
+        self.jid_storage = JidStorage(self.jid, self.storage, src_state=src_state)
         self.blocking = blocking
 
     async def __aenter__(self):
@@ -137,21 +147,33 @@ class Storage:
         self.redis = redis
 
     def _key(self, jid):
+        if isinstance(jid, bytes):
+            jid = jid.decode("utf-8")
         return f"job-{jid}"
 
     def _set_key(self, state):
         return f"job-state-{state}"
 
     async def lock(self, jid):
+        if isinstance(jid, bytes):
+            jid = jid.decode("utf-8")
         return self.redis.lock(f"job-lock-{jid}", timeout=JOB_LOCK_LEASE_TIMEOUT)
 
     async def set(self, jid, params, src_state):
+        if isinstance(jid, bytes):
+            jid = jid.decode("utf-8")
+
         await self.redis.hmset(self._key(jid), params)
         await self.redis.expire(self._key(jid), STORAGE_EXPIRY)
 
         if "state" in params:
-            await self.redis.srem(self._set_key(src_state), jid)
-            await self.redis.sadd(self._set_key(params["state"]), jid)
+            if src_state is not None:
+                print(src_state.decode("utf-8"), params["state"])
+                if src_state.decode("utf-8") != params["state"]:
+                    await self.redis.srem(self._set_key(src_state.decode("utf-8")), jid)
+                    await self.redis.sadd(self._set_key(params["state"]), jid)
+            else:
+                await self.redis.sadd(self._set_key(params["state"]), jid)
 
     async def get(self, jid, key):
         return await self.redis.hget(self._key(jid), key)
@@ -162,12 +184,12 @@ class Storage:
 
 
 class JidStorage:
-    def __init__(self, jid, storage):
+    def __init__(self, jid, storage, src_state=None):
         self.jid = jid
         self.storage = storage
         self.dirty = set()
         self.cached = {}
-        self.src_state = None
+        self.src_state = src_state
         self.flushing = None
         self._lock = None
 
@@ -193,7 +215,7 @@ class JidStorage:
         if key not in self.cached:
             val = await self.storage.get(self.jid, key)
             self.cached[key] = val
-            if key == "state":
+            if self.src_state is None and key == "state":
                 self.src_state = val
             return val
         return self.cached[key]
@@ -219,6 +241,15 @@ class JidStorage:
     async def set_variables(self, data):
         return await self.set("variables", orjson.dumps(data))
 
+    async def set_timestamp(self, val):
+        return await self.set("timestamp", str(val))
+
+    async def get_timestamp(self):
+        ts = await self.get("timestamp")
+        if ts is None:
+            return None
+        return int(ts)
+
     async def get_state(self):
         state = await self.get("state")
         if state is None:
@@ -239,6 +270,8 @@ class Job:
 
     async def load_data(self):
         trigger = await self.storage.get_trigger()
+        if trigger is None:
+            raise TriggerDataMissing()
         action = await self.service.get_action(trigger)
         await self.storage.set_action(action)
         variables = await self.service.resolve_properties(action.properties, trigger.meta)
@@ -249,6 +282,7 @@ class Job:
         action = await self.storage.get_action()
         variables = await self.storage.get_variables()
         await self.service.perform_action_async(self.jid, action.kind, variables)
+        await self.storage.set_timestamp(ts_now())
 
     async def proceed_many(self, time_remaining):
         while time_remaining():
@@ -258,11 +292,25 @@ class Job:
 
 
     async def has_timed_out(self):
-        return False
+        ts = await self.storage.get_timestamp()
+        if ts is None:
+            await self.storage.set_timestamp(ts_now())
+            return False
+
+        now = ts_now()
+        elapsed = now - ts
+        return elapsed > JOB_RUNNING_TIMEOUT
+
 
     async def process(self, time_remaining):
-        if not await self.proceed_many(time_remaining):
+        try:
+            if not await self.proceed_many(time_remaining):
+                return
+        except TriggerDataMissing:
+            print("Unable to fetch trigger data, revoking action")
+            await self.revoke()
             return
+        print(self.state)
         if self.state is Status.RUNNING:
             if await self.has_timed_out():
                 await self.error()
@@ -283,9 +331,4 @@ class Job:
     async def resume_and_process(self, time_remaining, result, data):
         if not await self.resume(time_remaining, result, data):
             return False
-        return await self.process(time_remaining)
-
-    async def timeout_and_process(self, time_remaining):
-        if not await self.error():
-            return
         return await self.process(time_remaining)
