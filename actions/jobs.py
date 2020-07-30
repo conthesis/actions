@@ -310,7 +310,6 @@ class Job:
             print("Unable to fetch trigger data, revoking action")
             await self.revoke()
             return
-        print(self.state)
         if self.state is Status.RUNNING:
             if await self.has_timed_out():
                 await self.error()
