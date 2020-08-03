@@ -1,14 +1,17 @@
+import msgpack
 import time
 import asyncio
 import os
 import aredis
-import orjson
 import traceback
-from .model import Action, ActionTrigger
+from .model import Action, ActionTrigger, ActionProperty
 from transitions import Transition
 from transitions.extensions.asyncio import AsyncMachine
 from enum import Enum
 from typing import Any, Optional
+import logging
+
+log = logging.getLogger("jobs")
 
 
 JOB_LOCK_LEASE_TIMEOUT = 5
@@ -22,7 +25,13 @@ def ts_now():
 class UnableToAcquireLockError(Exception):
     pass
 
-class TriggerDataMissing(Exception):
+class DataMissing(Exception):
+    pass
+
+class TriggerDataMissing(DataMissing):
+    pass
+
+class VariablesDataMissing(DataMissing):
     pass
 
 class JobsManager:
@@ -52,7 +61,7 @@ class JobsManager:
         self.periodic = asyncio.create_task(self.periodic_check_loop())
 
     async def periodic_check_loop(self):
-        print("Periodic check running")
+        log.info("Periodic check running")
         while True:
             try:
                 await self.periodic_check()
@@ -68,18 +77,18 @@ class JobsManager:
         await self.periodic
 
     async def periodic_check(self):
-        for status in [Status.RUNNING, Status.PENDING]:
+        for status in [Status.RUNNING, Status.PENDING, Status.RETRY]:
             jobs = await self.storage.random_sample(status)
             n_jobs = len(jobs)
             if n_jobs > 0:
-                print(f"Found {n_jobs} jobs with state {status}")
+                log.info(f"Found {n_jobs} jobs with state {status}")
             for jid in jobs:
                 try:
                     await self.process(jid.decode("utf-8"), blocking=False, src_state=status.value.encode("utf-8"))
                 except UnableToAcquireLockError:
                     pass
                 except Exception:
-                    print(f"Error handling jid={jid}")
+                    log.error(f"Error handling jid={jid}")
                     traceback.print_exc()
 
 
@@ -167,13 +176,16 @@ class Storage:
         await self.redis.expire(self._key(jid), STORAGE_EXPIRY)
 
         if "state" in params:
+            dst = params["state"]
             if src_state is not None:
-                print(src_state.decode("utf-8"), params["state"])
-                if src_state.decode("utf-8") != params["state"]:
-                    await self.redis.srem(self._set_key(src_state.decode("utf-8")), jid)
-                    await self.redis.sadd(self._set_key(params["state"]), jid)
+                src = src_state.decode("utf-8")
+                if src != dst:
+                    log.info(f"State for {jid} altered from {src} to {dst}")
+                    await self.redis.srem(self._set_key(src), jid)
+                    await self.redis.sadd(self._set_key(dst), jid)
             else:
-                await self.redis.sadd(self._set_key(params["state"]), jid)
+                log.info(f"State for {jid} became {dst}")
+                await self.redis.sadd(self._set_key(dst), jid)
 
     async def get(self, jid, key):
         return await self.redis.hget(self._key(jid), key)
@@ -236,10 +248,18 @@ class JidStorage:
         return await self.set("action", data.to_bytes())
 
     async def get_variables(self):
-        return orjson.loads(await self.get("variables"))
+        try:
+            vs = msgpack.unpackb(await self.get("variables"))
+            return [
+                ActionProperty.parse_obj(x)
+                for x in vs
+            ]
+        except:
+            raise VariablesDataMissing()
+
 
     async def set_variables(self, data):
-        return await self.set("variables", orjson.dumps(data))
+        return await self.set("variables", ActionProperty.many_to_bytes(data))
 
     async def set_timestamp(self, val):
         return await self.set("timestamp", str(val))
@@ -274,18 +294,21 @@ class Job:
             raise TriggerDataMissing()
         action = await self.service.get_action(trigger)
         await self.storage.set_action(action)
-        variables = await self.service.resolve_properties(action.properties, trigger.meta)
+        variables = await self.service.freeze_properties(action.properties, trigger.meta)
         await self.storage.set_variables(variables)
 
 
     async def start_run(self):
         action = await self.storage.get_action()
         variables = await self.storage.get_variables()
-        await self.service.perform_action_async(self.jid, action.kind, variables)
+        resolved = await self.service.resolve_properties(variables)
+        await self.service.perform_action_async(self.jid, action.kind, resolved)
         await self.storage.set_timestamp(ts_now())
 
     async def proceed_many(self, time_remaining):
         while time_remaining():
+            if self.state == Status.RUNNING:
+                return True
             if not await self.proceed():
                 return True
         return False
@@ -306,8 +329,8 @@ class Job:
         try:
             if not await self.proceed_many(time_remaining):
                 return
-        except TriggerDataMissing:
-            print("Unable to fetch trigger data, revoking action")
+        except DataMissing:
+            log.error("Unable to fetch trigger data, revoking action")
             await self.revoke()
             return
         if self.state is Status.RUNNING:

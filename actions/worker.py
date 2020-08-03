@@ -37,6 +37,8 @@ class Worker:
             if json:
                 data = orjson.dumps(data)
             await self.nc.publish(reply, data)
+        else:
+            log.error("NATS message reply-to was unset and we were unable to reply")
 
     async def handle_async_job(self, msg):
         start = time.monotonic()

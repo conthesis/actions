@@ -17,6 +17,7 @@ asyncio-nats-client = "*"
 pydantic = "*"
 transitions = "*"
 aredis = "*"
+msgpack = "*"
 
 [requires]
 python_version = "3.8"

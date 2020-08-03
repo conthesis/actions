@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from nats.aio.client import Client as NATS
 
@@ -7,6 +8,8 @@ from .entity_fetcher import EntityFetcher
 from .service import Service
 from .worker import Worker
 from .jobs import JobsManager
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 async def main():
