@@ -2,6 +2,7 @@ import time
 import asyncio
 import os
 import traceback
+import logging
 
 import orjson
 from nats.aio.client import Client as NATS
@@ -11,9 +12,10 @@ from actions.service import Service
 from actions.jobs import JobsManager
 
 ASYNC_TOPIC = "conthesis.action.TriggerAsyncAction"
-RESPONSE_TOPICS = "conthesis.actions.responses.*"
+RESPONSE_TOPICS = "conthesis.actions.responses.>"
 TOPIC = "conthesis.action.TriggerAction"
 
+log = logging.getLogger("worker")
 
 class Worker:
     svc: Service
@@ -62,6 +64,7 @@ class Worker:
     async def handle_action_response(self, msg):
         try:
             jid = msg.subject[len(RESPONSE_TOPICS) - 1 : ]
+            log.info(f"Resuming job {jid}")
             await self.jobs.resume(jid, orjson.loads(msg.data))
         except:
             traceback.print_exc()
