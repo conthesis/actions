@@ -10,6 +10,7 @@ from .worker import Worker
 from .jobs import JobsManager
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+logging.getLogger("transitions.extensions.asyncio").setLevel(logging.WARNING)
 
 
 async def main():

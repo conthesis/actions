@@ -54,16 +54,16 @@ class ActionProperty(BaseModel):
 
     def simplify(self, meta) -> Optional["ActionProperty"]:
         if self.kind == PropertyKind.LITERAL:
-            return None
+            return self
         elif self.kind == PropertyKind.PATH:
-            return None
+            return self
         elif self.kind == PropertyKind.META_FIELD:
             return self.copy_with(PropertyKind.LITERAL, meta.get(self.value))
         elif self.kind == PropertyKind.META_ENTITY:
-            res = meta.get(self.value)
-            if res is None:
-                return None
-            return self.copy_with(PropertyKind.PATH, f"/entity/{res}")
+            if (res := meta.get(self.value)) is None:
+                return self.copy_with(PropertyKind.LITERAL, None)
+            else:
+                return self.copy_with(PropertyKind.PATH, f"/entity/{res}")
         elif self.kind == PropertyKind.ENTITY:
             return self.copy_with(PropertyKind.PATH, f"/entity/{self.value}")
         else:

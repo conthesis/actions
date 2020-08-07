@@ -45,6 +45,7 @@ class Service:
         return orjson.loads(resp.data)
 
     async def perform_action_async(self, jid: str, kind: str, properties: Dict[str, Any]) -> None:
+        log.info(f"Attempting to call {_service_queue(kind)}")
         await self.nc.publish_request(_service_queue(kind), _response_queue(jid), orjson.dumps(properties))
 
     async def resolve_value(self, prop: ActionProperty) -> Any:

@@ -294,6 +294,8 @@ class Job:
             raise TriggerDataMissing()
         action = await self.service.get_action(trigger)
         await self.storage.set_action(action)
+        if any(p is None for p in action.properties):
+            log.error(f"Property in {action} was None")
         variables = await self.service.freeze_properties(action.properties, trigger.meta)
         await self.storage.set_variables(variables)
 
