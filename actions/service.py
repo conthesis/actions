@@ -103,10 +103,10 @@ class Service:
             trigger.action, Action
         ):
             return trigger.action
-        elif trigger.action_source == ActionSource.ENTITY and isinstance(
+        elif trigger.action_source == ActionSource.PATH and isinstance(
             trigger.action, str
         ):
-            data = await self.entity_fetcher.fetch(trigger.action)
+            data = await self.entity_fetcher.fetch_path(trigger.action)
             if data is None:
                 raise RuntimeError(f"Action {trigger.action} not found")
             return Action.from_bytes(data)

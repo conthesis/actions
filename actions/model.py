@@ -16,7 +16,7 @@ class PropertyKind(Enum):
 
 
 class ActionSource(Enum):
-    ENTITY = "ENTITY"
+    PATH = "PATH"
     LITERAL = "LITERAL"
 
 
