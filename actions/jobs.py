@@ -236,7 +236,12 @@ class JidStorage:
         data = await self.get("trigger")
         if data is None:
             return None
-        return ActionTrigger.from_bytes(data)
+        try:
+            return ActionTrigger.from_bytes(data)
+        except:
+            log.error(f"Trigger was invalid JSON {data}")
+            return None
+
 
     async def set_trigger(self, data):
         return await self.set("trigger", data.to_bytes())
